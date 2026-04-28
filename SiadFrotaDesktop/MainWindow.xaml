@@ -204,7 +204,31 @@
                                     <ComboBox x:Name="CmbMotorista"
                                               DisplayMemberPath="Display"
                                               SelectedValuePath="Matricula"
-                                              materialDesign:HintAssist.Hint="Motorista"/>
+                                              materialDesign:HintAssist.Hint="Motorista"
+                                              Margin="0,0,0,10"/>
+                                    <TextBlock Text="Data/Hora da saída" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <WrapPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Dia" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtSaidaDia" Width="36"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Mês" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtSaidaMes" Width="36"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Ano" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtSaidaAno" Width="52"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Hora" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtSaidaHora" Width="36"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Min" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtSaidaMinuto" Width="36"/>
+                                        </StackPanel>
+                                    </WrapPanel>
                                 </StackPanel>
 
                                 <!-- Retorno -->
@@ -213,7 +237,31 @@
                                              materialDesign:HintAssist.Hint="Hodômetro (chegada)"
                                              Margin="0,0,0,10"/>
                                     <TextBox x:Name="TxtRedsRetorno"
-                                             materialDesign:HintAssist.Hint="Número REDS"/>
+                                             materialDesign:HintAssist.Hint="Número REDS"
+                                             Margin="0,0,0,10"/>
+                                    <TextBlock Text="Data/Hora do retorno" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <WrapPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Dia" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtRetornoDia" Width="36"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Mês" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtRetornoMes" Width="36"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Ano" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtRetornoAno" Width="52"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,8,0">
+                                            <TextBlock Text="Hora" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtRetornoHora" Width="36"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Min" FontSize="12" Margin="0,0,0,2"/>
+                                            <TextBox x:Name="TxtRetornoMinuto" Width="36"/>
+                                        </StackPanel>
+                                    </WrapPanel>
                                 </StackPanel>
 
                                 <Button x:Name="BtnLancamento"

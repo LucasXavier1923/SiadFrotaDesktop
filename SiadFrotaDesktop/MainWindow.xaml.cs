@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using SiadFrotaDesktop.Models;
 using SiadFrotaDesktop.Services;
@@ -47,9 +48,33 @@ public partial class MainWindow : Window
         CmbMotorista.ItemsSource = _motoristas;
 
         Loaded += async (_, _) => await ReloadDataAsync();
+        Loaded += (_, _) => PreencherDataHoraSugeridaSeVazio();
 
         // Valor comum: usuário/ unidade ficam vazios por padrão (segurança).
         TxtUsuario.Text = "";
+    }
+
+    private void PreencherDataHoraSugeridaSeVazio()
+    {
+        var agora = DateTime.Now;
+
+        PreencherSeVazio(TxtSaidaDia, agora.ToString("dd"));
+        PreencherSeVazio(TxtSaidaMes, agora.ToString("MM"));
+        PreencherSeVazio(TxtSaidaAno, agora.ToString("yyyy"));
+        PreencherSeVazio(TxtSaidaHora, agora.ToString("HH"));
+        PreencherSeVazio(TxtSaidaMinuto, agora.ToString("mm"));
+
+        PreencherSeVazio(TxtRetornoDia, agora.ToString("dd"));
+        PreencherSeVazio(TxtRetornoMes, agora.ToString("MM"));
+        PreencherSeVazio(TxtRetornoAno, agora.ToString("yyyy"));
+        PreencherSeVazio(TxtRetornoHora, agora.ToString("HH"));
+        PreencherSeVazio(TxtRetornoMinuto, agora.ToString("mm"));
+    }
+
+    private static void PreencherSeVazio(TextBox txt, string valor)
+    {
+        if (string.IsNullOrWhiteSpace(txt.Text))
+            txt.Text = valor;
     }
 
     // ===========================
@@ -179,6 +204,62 @@ if (string.IsNullOrWhiteSpace(usuario) || string.IsNullOrWhiteSpace(senha) || st
             return f;
 
         return _frota.FirstOrDefault();
+    }
+
+    private static bool TryBuildDataHora(
+        TextBox txtDia,
+        TextBox txtMes,
+        TextBox txtAno,
+        TextBox txtHora,
+        TextBox txtMinuto,
+        out string dia,
+        out string mes,
+        out string ano,
+        out string hora,
+        out string minuto,
+        out string erro)
+    {
+        dia = mes = ano = hora = minuto = "";
+        erro = "";
+
+        var sDia = (txtDia.Text ?? "").Trim();
+        var sMes = (txtMes.Text ?? "").Trim();
+        var sAno = (txtAno.Text ?? "").Trim();
+        var sHora = (txtHora.Text ?? "").Trim();
+        var sMin = (txtMinuto.Text ?? "").Trim();
+
+        if (string.IsNullOrWhiteSpace(sDia) ||
+            string.IsNullOrWhiteSpace(sMes) ||
+            string.IsNullOrWhiteSpace(sAno) ||
+            string.IsNullOrWhiteSpace(sHora) ||
+            string.IsNullOrWhiteSpace(sMin))
+        {
+            erro = "Preencha Dia, Mês, Ano, Hora e Minuto.";
+            return false;
+        }
+
+        if (!int.TryParse(sDia, out var vDia) ||
+            !int.TryParse(sMes, out var vMes) ||
+            !int.TryParse(sAno, out var vAno) ||
+            !int.TryParse(sHora, out var vHora) ||
+            !int.TryParse(sMin, out var vMin))
+        {
+            erro = "Data/Hora deve conter apenas números.";
+            return false;
+        }
+
+        if (vDia < 1 || vDia > 31 || vMes < 1 || vMes > 12 || vAno < 1 || vAno > 9999 || vHora < 0 || vHora > 23 || vMin < 0 || vMin > 59)
+        {
+            erro = "Valores inválidos. Use Dia 1-31, Mês 1-12, Ano 1-9999, Hora 0-23 e Minuto 0-59.";
+            return false;
+        }
+
+        dia = vDia.ToString("00");
+        mes = vMes.ToString("00");
+        ano = vAno.ToString("0000");
+        hora = vHora.ToString("00");
+        minuto = vMin.ToString("00");
+        return true;
     }
 
     // ===========================
@@ -449,6 +530,8 @@ AppendLog("Campos de credenciais limpos.");
         // Trava de segurança: se os painéis ainda não foram instanciados, não faz nada.
         if (PanelSaida == null || PanelRetorno == null || RbSaida == null) return;
 
+        PreencherDataHoraSugeridaSeVazio();
+
         var saida = RbSaida.IsChecked == true;
         PanelSaida.Visibility = saida ? Visibility.Visible : Visibility.Collapsed;
         PanelRetorno.Visibility = saida ? Visibility.Collapsed : Visibility.Visible;
@@ -485,8 +568,29 @@ AppendLog("Campos de credenciais limpos.");
                     return;
                 }
 
+                if (!TryBuildDataHora(
+                        TxtSaidaDia,
+                        TxtSaidaMes,
+                        TxtSaidaAno,
+                        TxtSaidaHora,
+                        TxtSaidaMinuto,
+                        out var diaSaida,
+                        out var mesSaida,
+                        out var anoSaida,
+                        out var horaSaida,
+                        out var minutoSaida,
+                        out var erroSaida))
+                {
+                    AppendLog(erroSaida);
+                    MessageBox.Show(erroSaida, "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
                 progress.Report($"Condutor: {motorista.Nome}");
-                var res = await client.LancarSaidaAsync(usuario, senha, unidade, viatura.Placa, motorista, progress, _cts.Token);
+                var res = await client.LancarSaidaAsync(
+                    usuario, senha, unidade, viatura.Placa, motorista,
+                    diaSaida, mesSaida, anoSaida, horaSaida, minutoSaida,
+                    progress, _cts.Token);
 
                 AppendLog(res.Sucesso ? "✅ " + res.Mensagem : "❌ " + res.Mensagem);
                 MessageBox.Show(res.Mensagem, "SIAD", MessageBoxButton.OK, res.Sucesso ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -503,7 +607,28 @@ AppendLog("Campos de credenciais limpos.");
                     return;
                 }
 
-                var res = await client.LancarRetornoAsync(usuario, senha, unidade, viatura.Placa, odo, reds, progress, _cts.Token);
+                if (!TryBuildDataHora(
+                        TxtRetornoDia,
+                        TxtRetornoMes,
+                        TxtRetornoAno,
+                        TxtRetornoHora,
+                        TxtRetornoMinuto,
+                        out var diaRetorno,
+                        out var mesRetorno,
+                        out var anoRetorno,
+                        out var horaRetorno,
+                        out var minutoRetorno,
+                        out var erroRetorno))
+                {
+                    AppendLog(erroRetorno);
+                    MessageBox.Show(erroRetorno, "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var res = await client.LancarRetornoAsync(
+                    usuario, senha, unidade, viatura.Placa, odo, reds,
+                    diaRetorno, mesRetorno, anoRetorno, horaRetorno, minutoRetorno,
+                    progress, _cts.Token);
 
                 AppendLog(res.Sucesso ? "✅ " + res.Mensagem : "❌ " + res.Mensagem);
                 MessageBox.Show(res.Mensagem, "SIAD", MessageBoxButton.OK, res.Sucesso ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -554,3 +679,4 @@ AppendLog("Campos de credenciais limpos.");
     }
 
 }
+

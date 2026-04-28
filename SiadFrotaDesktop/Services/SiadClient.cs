@@ -491,6 +491,11 @@ resultados.Add(new ConsultaResultItem
         string unidade,
         string placa,
         Motorista motorista,
+        string dia,
+        string mes,
+        string ano,
+        string hora,
+        string minuto,
         IProgress<string>? log,
         CancellationToken ct)
     {
@@ -568,12 +573,11 @@ resultados.Add(new ConsultaResultItem
         {
             var payload = await HtmlFormHelper.MontarPayloadCompletoAsync(_parser, html);
 
-            var agora = DateTime.Now;
-            payload["POS902"] = agora.ToString("dd");
-            payload["POS907"] = agora.ToString("MM");
-            payload["POS912"] = agora.ToString("yyyy");
-            payload["POS951"] = agora.ToString("HH");
-            payload["POS956"] = agora.ToString("mm");
+            payload["POS902"] = dia;
+            payload["POS907"] = mes;
+            payload["POS912"] = ano;
+            payload["POS951"] = hora;
+            payload["POS956"] = minuto;
             payload["POS982"] = "1";
 
             payload["GX_ActionKey"] = "[enter]";
@@ -608,6 +612,11 @@ resultados.Add(new ConsultaResultItem
         string placa,
         string hodometroChegada,
         string reds,
+        string dia,
+        string mes,
+        string ano,
+        string hora,
+        string minuto,
         IProgress<string>? log,
         CancellationToken ct)
     {
@@ -634,6 +643,11 @@ resultados.Add(new ConsultaResultItem
             var payload = await HtmlFormHelper.MontarPayloadCompletoAsync(_parser, html);
             payload["POS1455"] = hodometroChegada;
             payload["POS1537"] = reds;
+            payload["POS1370"] = dia;
+            payload["POS1375"] = mes;
+            payload["POS1380"] = ano;
+            payload["POS1392"] = hora;
+            payload["POS1397"] = minuto;
 
             payload["GX_CursorPos"] = "1537";
             payload["GX_ActionKey"] = "[enter]";
