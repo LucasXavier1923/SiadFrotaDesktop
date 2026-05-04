@@ -35,6 +35,15 @@ private static string CleanField(string? s)
     return s;
 }
 
+private static bool IsNaoEncontrado(string? s)
+{
+    if (string.IsNullOrWhiteSpace(s)) return true;
+
+    var valor = s.Trim();
+    return valor.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase) ||
+           valor.Equals("NÃ£o encontrado", StringComparison.OrdinalIgnoreCase);
+}
+
     public SiadClient()
     {
         var handler = new HttpClientHandler
@@ -377,11 +386,31 @@ private static string CleanField(string? s)
         if (viaturas.Count == 0)
             return Array.Empty<ConsultaResultItem>();
 
+        if (viaturas.Count == 1)
+            return new[] { await ConsultarViaturaComSessaoAsync(usuario, senha, unidade, viaturas[0], log, ct) };
+
+        log?.Report($"Consultando {viaturas.Count} viaturas em paralelo...");
+        var tarefas = viaturas.Select(async viatura =>
+        {
+            using var client = new SiadClient();
+            return await client.ConsultarViaturaComSessaoAsync(usuario, senha, unidade, viatura, log, ct);
+        }).ToArray();
+
+        var resultados = await Task.WhenAll(tarefas);
+        log?.Report("Consulta finalizada.");
+        return resultados;
+    }
+
+    private async Task<ConsultaResultItem> ConsultarViaturaComSessaoAsync(
+        string usuario,
+        string senha,
+        string unidade,
+        FrotaItem viatura,
+        IProgress<string>? log,
+        CancellationToken ct)
+    {
         log?.Report("Conectando ao SIAD...");
-        var (ok, htmlLogin, seq) = await LoginAsync(usuario, senha, unidade, ct);
-
-
-
+        var (ok, _, seq) = await LoginAsync(usuario, senha, unidade, ct);
 
         if (!ok || string.IsNullOrWhiteSpace(seq))
             throw new InvalidOperationException("Login inválido (usuário/senha/unidade) ou falha ao capturar GX_SeqScreenNumber.");
@@ -394,25 +423,23 @@ private static string CleanField(string? s)
         html = await EnviarValorAsync("2", html, ct);
         html = await EnviarValorAsync("4", html, ct);
 
-        var resultados = new List<ConsultaResultItem>(capacity: viaturas.Count);
+        ct.ThrowIfCancellationRequested();
 
-        foreach (var v in viaturas)
-        {
-            ct.ThrowIfCancellationRequested();
+        log?.Report($"Processando {viatura.Codinome} ({viatura.Placa})...");
 
-            log?.Report($"Processando {v.Codinome} ({v.Placa})...");
+        // Seleciona modo de busca por placa.
+        html = await EnviarValorAsync("1", html, ct);
 
-            // Seleciona modo de busca por placa (no Python isso ocorre a cada iteração)
-            html = await EnviarValorAsync("1", html, ct);
+        var htmlResultado = await RealizarConsultaPlacaAsync(html, viatura.Placa, ct);
+        return await ExtrairResultadoConsultaAsync(htmlResultado, viatura);
+    }
 
-            var htmlResultado = await RealizarConsultaPlacaAsync(html, v.Placa, ct);
-
-            
-
+    private async Task<ConsultaResultItem> ExtrairResultadoConsultaAsync(string htmlResultado, FrotaItem v)
+    {
 // Placa: se não achar no HTML, usa a da frota
 var placaTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Placa");
 placaTxt = CleanField(placaTxt);
-if (string.IsNullOrWhiteSpace(placaTxt) || placaTxt.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase))
+if (IsNaoEncontrado(placaTxt))
     placaTxt = v.Placa;
 
 // Detecta se existe bloco de retorno
@@ -425,20 +452,20 @@ string odoTxt;
 if (temRetorno)
 {
     horaTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hora\\s*Retorno");
-    odoTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hodometro\\s*Retorno");
+    odoTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hod[oô]metro\\s*Retorno");
 }
 else
 {
     horaTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hora\\s*Atendimento");
-    odoTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hodometro\\s*Atendimento");
+    odoTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hod[oô]metro\\s*Atendimento");
 }
 
-// Fallback (GeneXus às vezes usa só "Hora"/"Hodometro")
-if (string.IsNullOrWhiteSpace(horaTxt) || horaTxt.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase))
+// Fallback (GeneXus às vezes usa só "Hora"/"Hodômetro")
+if (IsNaoEncontrado(horaTxt))
     horaTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hora", ocorrencia: -1);
 
-if (string.IsNullOrWhiteSpace(odoTxt) || odoTxt.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase))
-    odoTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hodometro", ocorrencia: -1);
+if (IsNaoEncontrado(odoTxt))
+    odoTxt = await HtmlFormHelper.BuscarTextoProximaCelulaAsync(_parser, htmlResultado, "Hod[oô]metro", ocorrencia: -1);
 
 horaTxt = CleanField(horaTxt);
 odoTxt = CleanField(odoTxt);
@@ -453,13 +480,13 @@ cpf = CleanField(cpf);
 nome = CleanField(nome);
 
 // Se ainda estiver "Não encontrado", deixa vazio (melhor UX)
-if (horaTxt.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase)) horaTxt = "";
-if (odoTxt.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase)) odoTxt = "";
-if (redsTxt.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase)) redsTxt = "";
-if (cpf.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase)) cpf = "";
-if (nome.Equals("Não encontrado", StringComparison.OrdinalIgnoreCase)) nome = "";
+if (IsNaoEncontrado(horaTxt)) horaTxt = "";
+if (IsNaoEncontrado(odoTxt)) odoTxt = "";
+if (IsNaoEncontrado(redsTxt)) redsTxt = "";
+if (IsNaoEncontrado(cpf)) cpf = "";
+if (IsNaoEncontrado(nome)) nome = "";
 
-resultados.Add(new ConsultaResultItem
+return new ConsultaResultItem
             {
                 Codinome = v.Codinome,
                 Placa = placaTxt,
@@ -468,17 +495,7 @@ resultados.Add(new ConsultaResultItem
                 Ocorrencias = redsTxt,
                 Cpf = cpf,
                 Nome = nome
-            });
-
-            // volta para a tela anterior
-            html = await VoltarTelaAsync(htmlResultado, ct);
-
-            // pequena pausa (igual ao time.sleep(0.5) no Python)
-            await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
-        }
-
-        log?.Report("Consulta finalizada.");
-        return resultados;
+            };
     }
 
     // ===========================
